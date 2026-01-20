@@ -1,0 +1,14 @@
+{
+  "name": "certisure-frontend",
+  "version": "0.1.0",
+  "description": "Frontend crypto helpers for Certisure / DataNominee.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "echo \"Integrate src/crypto/crypto.js into your React/Next.js app\"",
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {}
+}
+
+

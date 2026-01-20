@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certisure Demo - Client-Side Encryption + IPFS Upload</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 { color: #333; margin-top: 0; }
+    h2 { color: #555; margin-top: 30px; }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-left: 4px solid #4CAF50;
+      border-radius: 4px;
+    }
+    input, button, textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover { background: #45a049; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .output {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .success { color: #4CAF50; font-weight: bold; }
+    .error { color: #f44336; font-weight: bold; }
+    .info { color: #2196F3; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔐 Certisure Platform Demo</h1>
+    <p><strong>Client-Side Encryption + IPFS + PostgreSQL Integration</strong></p>
+
+    <div class="section">
+      <h2>Step 0: Check IPFS Connection</h2>
+      <button onclick="checkIpfsHealth()">Check IPFS Health</button>
+      <div id="ipfsHealthOutput" class="output"></div>
+    </div>
+
+    <div class="section">
+      <h2>Step 1: Authentication</h2>
+      <label>Email:</label>
+      <input type="email" id="email" value="alice@example.com" placeholder="alice@example.com">
+      
+      <label>Password:</label>
+      <input type="password" id="password" value="Password123" placeholder="Password123">
+      
+      <label>Role:</label>
+      <select id="role">
+        <option value="OWNER">OWNER</option>
+        <option value="NOMINEE">NOMINEE</option>
+        <option value="ACCESS_NOMINEE">ACCESS_NOMINEE</option>
+        <option value="VERIFIER">VERIFIER</option>
+        <option value="ISSUER">ISSUER</option>
+        <option value="REVIEWER">REVIEWER</option>
+      </select>
+      
+      <button onclick="register()">Register User</button>
+      <button onclick="login()">Login</button>
+      
+      <div id="authOutput" class="output"></div>
+    </div>
+
+    <div class="section">
+      <h2>Step 2: Client-Side Encryption</h2>
+      <label>Select File to Encrypt:</label>
+      <input type="file" id="fileInput">
+      
+      <button onclick="encryptAndShow()">Encrypt File (Client-Side)</button>
+      
+      <div id="encryptOutput" class="output"></div>
+    </div>
+
+    <div class="section">
+      <h2>Step 3: Upload Encrypted File to IPFS + PostgreSQL</h2>
+      <label>Asset Title:</label>
+      <input type="text" id="assetTitle" value="My Encrypted Document" placeholder="Asset title">
+      
+      <button onclick="uploadToIPFS()" id="uploadBtn" disabled>Upload Encrypted File to Backend</button>
+      
+      <div id="uploadOutput" class="output"></div>
+    </div>
+
+    <div class="section">
+      <h2>Step 4: Decrypt Downloaded File</h2>
+      <button onclick="decryptStored()" id="decryptBtn" disabled>Decrypt Using Stored Key</button>
+      
+      <div id="decryptOutput" class="output"></div>
+    </div>
+  </div>
+
+  <script>
+    // Embedded crypto helpers (from frontend/src/crypto/crypto.js)
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function base64ToArrayBuffer(base64) {
+      const binary = atob(base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    async function generateAesKey() {
+      const key = await crypto.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 },
+        true,
+        ['encrypt', 'decrypt']
+      );
+      const jwk = await crypto.subtle.exportKey('jwk', key);
+      return { key, jwk };
+    }
+
+    async function importAesKeyFromJwk(jwk) {
+      return crypto.subtle.importKey('jwk', jwk, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
+    }
+
+    async function encryptBytes(plainBytes, keyOptional) {
+      const input = plainBytes instanceof ArrayBuffer ? plainBytes : new Uint8Array(plainBytes).buffer;
+      const { key, jwk } = keyOptional
+        ? { key: keyOptional, jwk: await crypto.subtle.exportKey('jwk', keyOptional) }
+        : await generateAesKey();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, input);
+      return {
+        ciphertext,
+        iv,
+        key,
+        keyJwk: jwk,
+        ciphertextBase64: arrayBufferToBase64(ciphertext),
+        ivBase64: arrayBufferToBase64(iv.buffer)
+      };
+    }
+
+    async function decryptBytes(ciphertext, iv, keyJwk) {
+      const key = await importAesKeyFromJwk(keyJwk);
+      const ctBuffer = typeof ciphertext === 'string' ? base64ToArrayBuffer(ciphertext) : ciphertext;
+      const ivBuffer = typeof iv === 'string' ? base64ToArrayBuffer(iv) : iv;
+      return await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: new Uint8Array(ivBuffer) },
+        key,
+        ctBuffer
+      );
+    }
+
+    async function sha256(bytes) {
+      const input = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes).buffer;
+      const digest = await crypto.subtle.digest('SHA-256', input);
+      return arrayBufferToBase64(digest);
+    }
+
+    async function encryptFileForUpload(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const { ciphertext, iv, keyJwk, ciphertextBase64, ivBase64 } = await encryptBytes(arrayBuffer);
+      const contentHash = await sha256(ciphertext);
+      return {
+        ciphertext,
+        iv,
+        keyJwk,
+        ciphertextBase64,
+        ivBase64,
+        contentHash,
+        originalName: file.name,
+        mimeType: file.type
+      };
+    }
+
+    window.cryptoHelpers = { encryptFileForUpload, decryptBytes, sha256 };
+    const BACKEND_URL = 'http://localhost:4000/api';
+    
+    let storedToken = null;
+    let storedEncryptedData = null; // { ciphertext, iv, keyJwk, contentHash, originalName, mimeType }
+
+    window.checkIpfsHealth = async function() {
+      const output = document.getElementById('ipfsHealthOutput');
+      output.textContent = 'Checking IPFS connection...';
+      
+      try {
+        const res = await fetch(`${BACKEND_URL}/ipfs/health`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await res.json();
+        
+        if (data.connected) {
+          output.innerHTML = `<span class="success">✓ IPFS is connected and working!</span>\n\n` +
+            `API URL: ${data.apiUrl}\n` +
+            `Version: ${data.details.version?.version || 'N/A'}\n` +
+            `Peer ID: ${data.details.id?.id || 'N/A'}\n` +
+            `Test Upload CID: ${data.details.testAdd?.cid || 'N/A'}\n\n` +
+            `<strong>Full Details:</strong>\n${JSON.stringify(data, null, 2)}`;
+        } else {
+          output.innerHTML = `<span class="error">✗ IPFS connection failed</span>\n\n` +
+            `API URL: ${data.apiUrl}\n` +
+            `Error: ${data.error || 'Unknown error'}\n\n` +
+            `<strong>Troubleshooting:</strong>\n` +
+            `1. Make sure IPFS Desktop is running\n` +
+            `2. Or start IPFS daemon: ipfs daemon\n` +
+            `3. Check if API is accessible at: ${data.apiUrl}\n` +
+            `4. Try: curl ${data.apiUrl}/api/v0/version\n\n` +
+            `<strong>Full Details:</strong>\n${JSON.stringify(data, null, 2)}`;
+        }
+      } catch (err) {
+        output.innerHTML = `<span class="error">✗ Failed to check IPFS: ${err.message}</span>\n\n` +
+          `Make sure the backend is running on ${BACKEND_URL}`;
+      }
+    };
+
+    window.register = async function() {
+      const output = document.getElementById('authOutput');
+      output.textContent = 'Registering...';
+      
+      try {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const role = document.getElementById('role').value;
+        
+        const res = await fetch(`${BACKEND_URL}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ full_name: 'Demo User', email, password, role })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+          storedToken = data.token;
+          output.innerHTML = `<span class="success">✓ Registration successful!</span>\n\n${JSON.stringify(data, null, 2)}`;
+        } else {
+          output.innerHTML = `<span class="error">✗ Error: ${data.message || JSON.stringify(data)}</span>`;
+        }
+      } catch (err) {
+        output.innerHTML = `<span class="error">✗ Error: ${err.message}</span>`;
+      }
+    };
+
+    window.login = async function() {
+      const output = document.getElementById('authOutput');
+      output.textContent = 'Logging in...';
+      
+      try {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        const res = await fetch(`${BACKEND_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+          storedToken = data.token;
+          output.innerHTML = `<span class="success">✓ Login successful!</span>\n\nToken: ${data.token.substring(0, 50)}...\n\n${JSON.stringify(data.user, null, 2)}`;
+        } else {
+          output.innerHTML = `<span class="error">✗ Error: ${data.message || JSON.stringify(data)}</span>`;
+        }
+      } catch (err) {
+        output.innerHTML = `<span class="error">✗ Error: ${err.message}</span>`;
+      }
+    };
+
+    window.encryptAndShow = async function() {
+      const fileInput = document.getElementById('fileInput');
+      const output = document.getElementById('encryptOutput');
+      
+      if (!fileInput.files[0]) {
+        output.innerHTML = '<span class="error">Please select a file first</span>';
+        return;
+      }
+      
+      output.textContent = 'Encrypting file client-side...';
+      
+      try {
+        const file = fileInput.files[0];
+        const result = await encryptFileForUpload(file);
+        
+        storedEncryptedData = {
+          ciphertext: result.ciphertextBase64,
+          iv: result.ivBase64,
+          keyJwk: result.keyJwk,
+          contentHash: result.contentHash,
+          originalName: result.originalName,
+          mimeType: result.mimeType
+        };
+        
+        document.getElementById('uploadBtn').disabled = false;
+        document.getElementById('decryptBtn').disabled = false;
+        
+        output.innerHTML = `<span class="success">✓ File encrypted successfully!</span>\n\n` +
+          `Original: ${result.originalName} (${(file.size / 1024).toFixed(2)} KB)\n` +
+          `Encrypted size: ${(result.ciphertext.byteLength / 1024).toFixed(2)} KB\n` +
+          `Content Hash: ${result.contentHash}\n` +
+          `IV: ${result.ivBase64.substring(0, 30)}...\n` +
+          `Key (JWK): Stored securely (not shown)\n\n` +
+          `<span class="info">Note: Plaintext never left your browser. Only encrypted bytes will be uploaded.</span>`;
+      } catch (err) {
+        output.innerHTML = `<span class="error">✗ Encryption error: ${err.message}</span>`;
+      }
+    };
+
+    window.uploadToIPFS = async function() {
+      if (!storedToken) {
+        alert('Please login first!');
+        return;
+      }
+      if (!storedEncryptedData) {
+        alert('Please encrypt a file first!');
+        return;
+      }
+      
+      const output = document.getElementById('uploadOutput');
+      output.textContent = 'Uploading encrypted file to IPFS + PostgreSQL...';
+      
+      try {
+        const title = document.getElementById('assetTitle').value || storedEncryptedData.originalName;
+        
+        // Convert base64 ciphertext to Blob
+        const ciphertextBytes = Uint8Array.from(atob(storedEncryptedData.ciphertext), c => c.charCodeAt(0));
+        const blob = new Blob([ciphertextBytes], { type: 'application/octet-stream' });
+        
+        const formData = new FormData();
+        formData.append('file', blob, storedEncryptedData.originalName);
+        formData.append('title', title);
+        formData.append('type', storedEncryptedData.mimeType);
+        formData.append('content_hash', storedEncryptedData.contentHash);
+        
+        const res = await fetch(`${BACKEND_URL}/assets`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${storedToken}` },
+          body: formData
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+          output.innerHTML = `<span class="success">✓ Upload successful!</span>\n\n` +
+            `Asset ID: ${data.asset.asset_id}\n` +
+            `IPFS CID: ${data.asset.encrypted_cid}\n` +
+            `Stored in PostgreSQL: ✓\n` +
+            `Stored on IPFS: ✓\n\n` +
+            `${JSON.stringify(data.asset, null, 2)}`;
+        } else {
+          output.innerHTML = `<span class="error">✗ Upload error: ${data.message || JSON.stringify(data)}</span>`;
+        }
+      } catch (err) {
+        output.innerHTML = `<span class="error">✗ Upload error: ${err.message}</span>`;
+      }
+    };
+
+    window.decryptStored = async function() {
+      if (!storedEncryptedData) {
+        alert('Please encrypt a file first!');
+        return;
+      }
+      
+      const output = document.getElementById('decryptOutput');
+      output.textContent = 'Decrypting file...';
+      
+      try {
+        const decrypted = await decryptBytes(
+          storedEncryptedData.ciphertext,
+          storedEncryptedData.iv,
+          storedEncryptedData.keyJwk
+        );
+        
+        const blob = new Blob([decrypted], { type: storedEncryptedData.mimeType });
+        const url = URL.createObjectURL(blob);
+        
+        output.innerHTML = `<span class="success">✓ Decryption successful!</span>\n\n` +
+          `Decrypted size: ${(decrypted.byteLength / 1024).toFixed(2)} KB\n` +
+          `Original name: ${storedEncryptedData.originalName}\n\n` +
+          `<a href="${url}" download="${storedEncryptedData.originalName}" class="success">Download Decrypted File</a>`;
+      } catch (err) {
+        output.innerHTML = `<span class="error">✗ Decryption error: ${err.message}</span>`;
+      }
+    };
+  </script>
+</body>
+</html>
+
