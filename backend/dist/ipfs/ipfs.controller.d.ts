@@ -5,10 +5,15 @@ export declare class IpfsController {
     checkIpfsHealth(): Promise<{
         connected: boolean;
         apiUrl: string;
-        error: string | null;
-        details: any;
+        version: any;
+        error?: undefined;
+    } | {
+        connected: boolean;
+        apiUrl: string;
+        error: any;
+        version?: undefined;
     }>;
-    uploadEncryptedAsset(file: Express.Multer.File, title: string, type: string, content_hash: string, assigned_nominee_id: string, owner_id: string): Promise<{
+    uploadEncryptedAsset(file: Express.Multer.File, title: string, type: string, content_hash: string, wallet_address: string, assigned_nominee_id: string): Promise<{
         asset: import("../assets/asset.entity").Asset;
     }>;
 }

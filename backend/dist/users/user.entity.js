@@ -15,37 +15,37 @@ let User = class User {
 };
 exports.User = User;
 __decorate([
-    (0, typeorm_1.PrimaryGeneratedColumn)('uuid'),
+    (0, typeorm_1.PrimaryGeneratedColumn)('uuid', { name: 'user_id' }),
     __metadata("design:type", String)
 ], User.prototype, "user_id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ length: 100 }),
+    (0, typeorm_1.Column)({ length: 100, name: 'full_name' }),
     __metadata("design:type", String)
 ], User.prototype, "full_name", void 0);
 __decorate([
     (0, typeorm_1.Index)({ unique: true }),
-    (0, typeorm_1.Column)({ length: 150 }),
+    (0, typeorm_1.Column)({ length: 150, name: 'email' }),
     __metadata("design:type", String)
 ], User.prototype, "email", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'text' }),
+    (0, typeorm_1.Column)({ type: 'text', name: 'password_hash' }),
     __metadata("design:type", String)
 ], User.prototype, "password_hash", void 0);
 __decorate([
     (0, typeorm_1.Index)(),
-    (0, typeorm_1.Column)({ length: 30 }),
+    (0, typeorm_1.Column)({ length: 30, name: 'role' }),
     __metadata("design:type", String)
 ], User.prototype, "role", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ default: true }),
+    (0, typeorm_1.Column)({ default: true, name: 'is_active' }),
     __metadata("design:type", Boolean)
 ], User.prototype, "is_active", void 0);
 __decorate([
-    (0, typeorm_1.CreateDateColumn)({ type: 'timestamptz' }),
+    (0, typeorm_1.CreateDateColumn)({ type: 'timestamptz', name: 'created_at' }),
     __metadata("design:type", Date)
 ], User.prototype, "created_at", void 0);
 __decorate([
-    (0, typeorm_1.UpdateDateColumn)({ type: 'timestamptz' }),
+    (0, typeorm_1.UpdateDateColumn)({ type: 'timestamptz', name: 'updated_at' }),
     __metadata("design:type", Date)
 ], User.prototype, "updated_at", void 0);
 exports.User = User = __decorate([

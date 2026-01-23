@@ -2,6 +2,7 @@ import { Body, Controller, Post, UsePipes, ValidationPipe } from '@nestjs/common
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { WalletAuthDto } from './dto/wallet-auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -18,6 +19,12 @@ export class AuthController {
   async login(@Body() dto: LoginDto) {
     const user = await this.authService.validateUser(dto.email, dto.password);
     return this.authService.login(user);
+  }
+
+  @Post('wallet')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async walletAuth(@Body() dto: WalletAuthDto) {
+    return this.authService.walletAuth(dto);
   }
 }
 

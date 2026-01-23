@@ -65,6 +65,26 @@ let AuthService = class AuthService {
         const { password_hash: _, ...safeUser } = user;
         return { token, user: safeUser };
     }
+    async walletAuth(dto) {
+        const email = `${dto.wallet_address.toLowerCase()}@wallet.certisure`;
+        let user = await this.userRepo.findOne({ where: { email } });
+        if (!user) {
+            const password_hash = await bcrypt.hash(dto.wallet_address, 10);
+            user = this.userRepo.create({
+                full_name: dto.full_name || `Wallet User ${dto.wallet_address.slice(0, 6)}...${dto.wallet_address.slice(-4)}`,
+                email,
+                password_hash,
+                role: (dto.role || 'OWNER')
+            });
+            user = await this.userRepo.save(user);
+        }
+        if (!user.is_active) {
+            throw new common_1.UnauthorizedException('Account is inactive');
+        }
+        const token = this.generateToken(user);
+        const { password_hash: _, ...safeUser } = user;
+        return { token, user: safeUser };
+    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([

@@ -1,6 +1,7 @@
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { WalletAuthDto } from './dto/wallet-auth.dto';
 export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
@@ -17,6 +18,18 @@ export declare class AuthController {
         };
     }>;
     login(dto: LoginDto): Promise<{
+        token: string;
+        user: {
+            user_id: string;
+            full_name: string;
+            email: string;
+            role: import("../users/user.entity").UserRole;
+            is_active: boolean;
+            created_at: Date;
+            updated_at: Date;
+        };
+    }>;
+    walletAuth(dto: WalletAuthDto): Promise<{
         token: string;
         user: {
             user_id: string;

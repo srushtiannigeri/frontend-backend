@@ -5,9 +5,10 @@ import {
   UploadedFile,
   UseInterceptors,
   Body,
-  BadRequestException
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { IpfsService } from './ipfs.service';
 
 @Controller()
@@ -19,37 +20,42 @@ export class IpfsController {
     return this.ipfsService.checkConnection();
   }
 
-  // NOTE: For demo purposes, this endpoint is left unauthenticated and expects owner_id in the body.
-  // In production, protect with JwtAuthGuard + RolesGuard and derive owner_id from req.user.
   @Post('assets')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(), // ✅ IMPORTANT
+      limits: { fileSize: 25 * 1024 * 1024 }, // optional 25MB
+    }),
+  )
   async uploadEncryptedAsset(
     @UploadedFile() file: Express.Multer.File,
     @Body('title') title: string,
     @Body('type') type: string,
     @Body('content_hash') content_hash: string,
+    @Body('wallet_address') wallet_address: string,
     @Body('assigned_nominee_id') assigned_nominee_id: string,
-    @Body('owner_id') owner_id: string
   ) {
     if (!file) {
-      throw new BadRequestException('Missing file (expected field \"file\")');
+      throw new BadRequestException('Missing file (expected field "file")');
     }
 
-    if (!owner_id) {
-      throw new BadRequestException('Missing owner_id in form data');
+    if (!file.buffer) {
+      throw new BadRequestException('File buffer missing. Check multer memoryStorage() setup.');
+    }
+
+    if (!wallet_address) {
+      throw new BadRequestException('Missing wallet_address');
     }
 
     const asset = await this.ipfsService.storeEncryptedAsset({
-      owner_id,
+      owner_id: wallet_address, // Use wallet address directly
       buffer: file.buffer,
       title: title || file.originalname,
       type: type || file.mimetype,
       content_hash,
-      assigned_nominee_id
+      assigned_nominee_id,
     });
 
     return { asset };
   }
 }
-
-

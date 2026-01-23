@@ -3,46 +3,35 @@ import {
   CreateDateColumn,
   Entity,
   Index,
-  JoinColumn,
-  ManyToOne,
   PrimaryGeneratedColumn
 } from 'typeorm';
-import { User } from '../users/user.entity';
 
 @Entity({ name: 'assets' })
 export class Asset {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid', { name: 'asset_id' })
   asset_id: string;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'owner_id' })
-  owner: User;
-
   @Index()
-  @Column({ type: 'uuid' })
-  owner_id: string;
+  @Column({ type: 'varchar', length: 255, name: 'owner_id' })
+  owner_id: string; // Wallet address stored as string
 
-  @Column({ length: 255 })
+  @Column({ length: 255, name: 'title' })
   title: string;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true, name: 'type' })
   type: string | null;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'text', name: 'encrypted_cid' })
   encrypted_cid: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, name: 'content_hash' })
   content_hash: string | null;
 
-  @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'assigned_nominee_id' })
-  assigned_nominee: User | null;
-
   @Index()
-  @Column({ type: 'uuid', nullable: true })
-  assigned_nominee_id: string | null;
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'assigned_nominee_id' })
+  assigned_nominee_id: string | null; // Wallet address stored as string
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   created_at: Date;
 }
 

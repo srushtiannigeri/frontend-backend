@@ -11,52 +11,41 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Asset = void 0;
 const typeorm_1 = require("typeorm");
-const user_entity_1 = require("../users/user.entity");
 let Asset = class Asset {
 };
 exports.Asset = Asset;
 __decorate([
-    (0, typeorm_1.PrimaryGeneratedColumn)('uuid'),
+    (0, typeorm_1.PrimaryGeneratedColumn)('uuid', { name: 'asset_id' }),
     __metadata("design:type", String)
 ], Asset.prototype, "asset_id", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, { onDelete: 'CASCADE' }),
-    (0, typeorm_1.JoinColumn)({ name: 'owner_id' }),
-    __metadata("design:type", user_entity_1.User)
-], Asset.prototype, "owner", void 0);
-__decorate([
     (0, typeorm_1.Index)(),
-    (0, typeorm_1.Column)({ type: 'uuid' }),
+    (0, typeorm_1.Column)({ type: 'varchar', length: 255, name: 'owner_id' }),
     __metadata("design:type", String)
 ], Asset.prototype, "owner_id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ length: 255 }),
+    (0, typeorm_1.Column)({ length: 255, name: 'title' }),
     __metadata("design:type", String)
 ], Asset.prototype, "title", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'varchar', length: 100, nullable: true }),
+    (0, typeorm_1.Column)({ type: 'varchar', length: 100, nullable: true, name: 'type' }),
     __metadata("design:type", Object)
 ], Asset.prototype, "type", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'text' }),
+    (0, typeorm_1.Column)({ type: 'text', name: 'encrypted_cid' }),
     __metadata("design:type", String)
 ], Asset.prototype, "encrypted_cid", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    (0, typeorm_1.Column)({ type: 'text', nullable: true, name: 'content_hash' }),
     __metadata("design:type", Object)
 ], Asset.prototype, "content_hash", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, { nullable: true }),
-    (0, typeorm_1.JoinColumn)({ name: 'assigned_nominee_id' }),
-    __metadata("design:type", Object)
-], Asset.prototype, "assigned_nominee", void 0);
-__decorate([
     (0, typeorm_1.Index)(),
-    (0, typeorm_1.Column)({ type: 'uuid', nullable: true }),
+    (0, typeorm_1.Column)({ type: 'varchar', length: 255, nullable: true, name: 'assigned_nominee_id' }),
     __metadata("design:type", Object)
 ], Asset.prototype, "assigned_nominee_id", void 0);
 __decorate([
-    (0, typeorm_1.CreateDateColumn)({ type: 'timestamptz' }),
+    (0, typeorm_1.CreateDateColumn)({ type: 'timestamptz', name: 'created_at' }),
     __metadata("design:type", Date)
 ], Asset.prototype, "created_at", void 0);
 exports.Asset = Asset = __decorate([

@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const auth_service_1 = require("./auth.service");
 const register_dto_1 = require("./dto/register.dto");
 const login_dto_1 = require("./dto/login.dto");
+const wallet_auth_dto_1 = require("./dto/wallet-auth.dto");
 let AuthController = class AuthController {
     constructor(authService) {
         this.authService = authService;
@@ -27,6 +28,9 @@ let AuthController = class AuthController {
     async login(dto) {
         const user = await this.authService.validateUser(dto.email, dto.password);
         return this.authService.login(user);
+    }
+    async walletAuth(dto) {
+        return this.authService.walletAuth(dto);
     }
 };
 exports.AuthController = AuthController;
@@ -46,6 +50,14 @@ __decorate([
     __metadata("design:paramtypes", [login_dto_1.LoginDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
+__decorate([
+    (0, common_1.Post)('wallet'),
+    (0, common_1.UsePipes)(new common_1.ValidationPipe({ whitelist: true, forbidNonWhitelisted: true })),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [wallet_auth_dto_1.WalletAuthDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "walletAuth", null);
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('auth'),
     __metadata("design:paramtypes", [auth_service_1.AuthService])

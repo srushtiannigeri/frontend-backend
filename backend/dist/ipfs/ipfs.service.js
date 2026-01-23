@@ -15,6 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.IpfsService = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
+const axios_1 = require("axios");
+const FormData = require("form-data");
 const typeorm_2 = require("typeorm");
 const asset_entity_1 = require("../assets/asset.entity");
 let IpfsService = class IpfsService {
@@ -22,119 +24,61 @@ let IpfsService = class IpfsService {
         this.assetRepo = assetRepo;
         this.ipfsApiUrl = process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
     }
-    async getIpfsClient() {
-        if (!this.ipfs) {
-            try {
-                const ipfsModule = await Promise.resolve().then(() => require('ipfs-http-client'));
-                const createIpfsClient = ipfsModule.create ||
-                    (ipfsModule.default && ipfsModule.default.create) ||
-                    ipfsModule.default;
-                if (typeof createIpfsClient !== 'function') {
-                    console.error('ipfs-http-client import shape unexpected:', Object.keys(ipfsModule));
-                    throw new Error('IPFS client factory not found');
-                }
-                this.ipfs = createIpfsClient({ url: this.ipfsApiUrl });
-                console.log(`IPFS client initialized with URL: ${this.ipfsApiUrl}`);
-            }
-            catch (err) {
-                console.error('Failed to initialize IPFS client:', err);
-                throw err;
-            }
-        }
-        return this.ipfs;
-    }
     async checkConnection() {
-        var _a;
-        const status = {
-            connected: false,
-            apiUrl: this.ipfsApiUrl,
-            error: null,
-            details: {}
-        };
         try {
-            const client = await this.getIpfsClient();
-            try {
-                const version = await client.version();
-                status.connected = true;
-                status.details.version = version;
-            }
-            catch (versionErr) {
-                status.error = `Version check failed: ${versionErr.message}`;
-                status.details.versionError = versionErr.toString();
-            }
-            try {
-                const id = await client.id();
-                status.details.id = {
-                    id: id.id,
-                    addresses: ((_a = id.addresses) === null || _a === void 0 ? void 0 : _a.slice(0, 3)) || []
-                };
-            }
-            catch (idErr) {
-                status.error = status.error
-                    ? `${status.error}; ID check failed: ${idErr.message}`
-                    : `ID check failed: ${idErr.message}`;
-                status.details.idError = idErr.toString();
-            }
-            try {
-                const testData = Buffer.from('IPFS connection test');
-                const result = await client.add(testData);
-                status.details.testAdd = {
-                    success: true,
-                    cid: result.cid.toString()
-                };
-            }
-            catch (addErr) {
-                status.error = status.error
-                    ? `${status.error}; Test add failed: ${addErr.message}`
-                    : `Test add failed: ${addErr.message}`;
-                status.details.addError = addErr.toString();
-            }
+            const res = await axios_1.default.post(`${this.ipfsApiUrl}/api/v0/version`);
+            return { connected: true, apiUrl: this.ipfsApiUrl, version: res.data };
         }
-        catch (initErr) {
-            status.error = `Failed to initialize IPFS client: ${initErr.message}`;
-            status.details.initError = initErr.toString();
-            status.details.suggestion =
-                'Make sure IPFS daemon is running. Try: ipfs daemon or check IPFS Desktop is running.';
+        catch (err) {
+            return {
+                connected: false,
+                apiUrl: this.ipfsApiUrl,
+                error: (err === null || err === void 0 ? void 0 : err.message) || 'IPFS connection failed',
+            };
         }
-        return status;
+    }
+    async uploadToIpfs(buffer, filename = 'file.bin') {
+        try {
+            const form = new FormData();
+            form.append('file', buffer, { filename });
+            const res = await axios_1.default.post(`${this.ipfsApiUrl}/api/v0/add`, form, {
+                headers: form.getHeaders(),
+                maxBodyLength: Infinity,
+            });
+            return res.data.Hash;
+        }
+        catch (err) {
+            throw new common_1.InternalServerErrorException(`IPFS upload failed: ${(err === null || err === void 0 ? void 0 : err.message) || err}`);
+        }
+    }
+    async addToMfs(cid, fileName) {
+        try {
+            await axios_1.default.post(`${this.ipfsApiUrl}/api/v0/files/mkdir?arg=/certisure&parents=true`);
+            await axios_1.default.post(`${this.ipfsApiUrl}/api/v0/files/cp?arg=/ipfs/${cid}&arg=/certisure/${fileName}`);
+            console.log(`✅ Added to MFS: /certisure/${fileName}`);
+        }
+        catch (err) {
+            console.warn('⚠️ Failed to add file into MFS (optional):', (err === null || err === void 0 ? void 0 : err.message) || err);
+        }
     }
     async storeEncryptedAsset(params) {
-        var _a, _b, _c, _d;
+        var _a, _b, _c;
         try {
-            const client = await this.getIpfsClient();
-            let cid;
-            try {
-                const result = await client.add(params.buffer);
-                cid = result.cid.toString();
-                console.log(`Successfully uploaded to IPFS. CID: ${cid}`);
-            }
-            catch (ipfsErr) {
-                console.error('IPFS add failed:', {
-                    error: ipfsErr.message,
-                    apiUrl: this.ipfsApiUrl,
-                    suggestion: 'Check if IPFS daemon is running. Try: GET /api/ipfs/health to diagnose'
-                });
-                throw new common_1.InternalServerErrorException(`IPFS upload failed: ${ipfsErr.message}. Check IPFS connection at ${this.ipfsApiUrl}`);
-            }
+            const cid = await this.uploadToIpfs(params.buffer, params.title);
+            const safeTitle = (params.title || 'encrypted_file')
+                .replace(/\s+/g, '_')
+                .replace(/[^a-zA-Z0-9._-]/g, '');
+            const mfsFileName = `${Date.now()}_${safeTitle}`;
+            await this.addToMfs(cid, mfsFileName);
             const asset = this.assetRepo.create({
                 owner_id: params.owner_id,
                 title: params.title,
                 type: (_a = params.type) !== null && _a !== void 0 ? _a : null,
                 encrypted_cid: cid,
                 content_hash: (_b = params.content_hash) !== null && _b !== void 0 ? _b : null,
-                assigned_nominee_id: (_c = params.assigned_nominee_id) !== null && _c !== void 0 ? _c : null
+                assigned_nominee_id: (_c = params.assigned_nominee_id) !== null && _c !== void 0 ? _c : null,
             });
-            try {
-                const saved = await this.assetRepo.save(asset);
-                return saved;
-            }
-            catch (dbErr) {
-                console.error('Postgres insert into assets failed', {
-                    owner_id: params.owner_id,
-                    assigned_nominee_id: (_d = params.assigned_nominee_id) !== null && _d !== void 0 ? _d : null
-                });
-                throw dbErr;
-            }
+            return await this.assetRepo.save(asset);
         }
         catch (err) {
             console.error('IPFS store error', err);

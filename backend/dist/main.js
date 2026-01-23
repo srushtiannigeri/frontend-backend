@@ -7,6 +7,12 @@ async function bootstrap() {
     dotenv.config();
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.setGlobalPrefix('api');
+    app.enableCors({
+        origin: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: true,
+    });
     const port = process.env.PORT || 4000;
     await app.listen(port);
     console.log(`Certisure NestJS backend listening on port ${port}`);
